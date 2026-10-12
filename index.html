@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>適時開示通知</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="開示通知">
+<meta name="theme-color" content="#0f2440">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+  :root {
+    --bg: #f3f5f8; --card: #ffffff; --text: #18202b; --sub: #667085; --line: #e3e7ee;
+    --accent: #1f5fbf; --accent-soft: #e6eefb; --danger: #c43d3d; --ok: #1f8a4c;
+    --head: #0f2440; --head-text: #ffffff; --input: #f7f8fa;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d1117; --card: #161b22; --text: #e6edf3; --sub: #8b949e; --line: #2a313b;
+      --accent: #5b9bff; --accent-soft: #1b2a42; --danger: #ff6b6b; --ok: #3fb96f;
+      --head: #0b1a2f; --head-text: #e6edf3; --input: #0f141a;
+    }
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--head); color: var(--head-text);
+    padding: calc(env(safe-area-inset-top) + 12px) 16px 12px; display: flex; align-items: center; justify-content: space-between; }
+  header h1 { font-size: 17px; margin: 0; font-weight: 700; letter-spacing: .02em; }
+  header button { background: transparent; border: 1px solid rgba(255,255,255,.35); color: inherit;
+    border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+  main { padding: 12px 16px calc(env(safe-area-inset-bottom) + 96px); max-width: 640px; margin: 0 auto; }
+  nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 5; display: flex; background: var(--card);
+    border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
+  nav button { flex: 1; background: none; border: 0; padding: 10px 0 8px; color: var(--sub); font-size: 11px; }
+  nav button svg { display: block; margin: 0 auto 3px; width: 24px; height: 24px; }
+  nav button.on { color: var(--accent); font-weight: 700; }
+  .tab { display: none; } .tab.on { display: block; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 10px; }
+  .meta { font-size: 12px; color: var(--sub); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .code { font-weight: 700; color: var(--text); }
+  .ttl { font-size: 15px; line-height: 1.5; margin: 6px 0; }
+  .chip { display: inline-block; font-size: 11px; background: var(--accent-soft); color: var(--accent);
+    border-radius: 999px; padding: 2px 8px; }
+  a.card { display: block; color: inherit; text-decoration: none; }
+  .empty { text-align: center; color: var(--sub); padding: 40px 0; font-size: 14px; line-height: 1.7; }
+  label.f { display: block; font-size: 12px; color: var(--sub); margin: 8px 0 4px; }
+  input[type=text], input[type=url], input[type=password] { width: 100%; font-size: 16px; padding: 10px 12px;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--input); color: var(--text); }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .row .grow { flex: 1; min-width: 0; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 10px;
+    padding: 12px 16px; font-size: 15px; font-weight: 600; background: var(--accent); color: #fff; width: 100%; margin-top: 10px; }
+  .btn.sub { background: var(--accent-soft); color: var(--accent); }
+  .btn.danger { background: transparent; color: var(--danger); border: 1px solid var(--line); width: auto; padding: 8px 12px; font-size: 13px; margin: 0; }
+  .btn:disabled { opacity: .5; }
+  .sw { position: relative; width: 50px; height: 30px; flex: none; }
+  .sw input { opacity: 0; width: 0; height: 0; }
+  .sw span { position: absolute; inset: 0; background: var(--line); border-radius: 30px; transition: .2s; }
+  .sw span::before { content: ""; position: absolute; width: 24px; height: 24px; left: 3px; top: 3px; background: #fff;
+    border-radius: 50%; transition: .2s; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
+  .sw input:checked + span { background: var(--ok); }
+  .sw input:checked + span::before { transform: translateX(20px); }
+  .kw-head { font-weight: 700; font-size: 15px; }
+  .hint { font-size: 12px; color: var(--sub); line-height: 1.6; }
+  .sticky-save { position: fixed; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 58px); padding: 0 16px; z-index: 4; display: none; }
+  .sticky-save.show { display: block; }
+  .sticky-save .btn { max-width: 608px; margin: 0 auto; display: flex; box-shadow: 0 4px 16px rgba(0,0,0,.2); }
+  .status { font-size: 13px; padding: 8px 10px; border-radius: 8px; margin-top: 10px; display: none; line-height: 1.5; }
+  .status.show { display: block; }
+  .status.ok { background: rgba(31,138,76,.12); color: var(--ok); }
+  .status.ng { background: rgba(196,61,61,.12); color: var(--danger); }
+  .sec { font-size: 13px; color: var(--sub); margin: 18px 4px 8px; font-weight: 600; }
+  #toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(env(safe-area-inset-bottom) + 130px);
+    background: rgba(20,26,35,.92); color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 14px;
+    opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 10; max-width: 90%; text-align: center; }
+  #toast.show { opacity: 1; }
+</style>
+</head>
+<body>
+<header>
+  <h1>適時開示通知</h1>
+  <button id="reload" type="button">更新</button>
+</header>
+
+<main>
+  <section class="tab on" id="tab-history">
+    <div id="historyList"><div class="empty">読み込み中…</div></div>
+  </section>
+
+  <section class="tab" id="tab-keywords">
+    <p class="hint">スペース区切り＝すべて含む、「|」区切り＝どれか含む。<br>例：「株主優待 新設」「株式 売出|売り出」</p>
+    <div id="kwList"></div>
+    <button class="btn sub" id="addKw" type="button">＋ キーワードを追加</button>
+  </section>
+
+  <section class="tab" id="tab-settings">
+    <div class="sec">通知</div>
+    <div class="card">
+      <div class="row"><div class="grow">監視（5分おきにチェック）</div>
+        <label class="sw"><input type="checkbox" id="setEnabled"><span></span></label></div>
+    </div>
+    <div class="card">
+      <div class="row"><div class="grow">メールにも通知する</div>
+        <label class="sw"><input type="checkbox" id="setMail"><span></span></label></div>
+    </div>
+    <div class="card">
+      <div class="row"><div class="grow">この iPhone へのプッシュ通知</div><div class="hint" id="pushState"></div></div>
+      <button class="btn" id="enablePush" type="button">通知をONにする</button>
+      <button class="btn sub" id="testPush" type="button">テスト通知を送る</button>
+      <div class="status" id="pushStatus"></div>
+    </div>
+
+    <div class="sec">接続先（Apps Script）</div>
+    <div class="card">
+      <label class="f" for="gasUrl">ウェブアプリのURL</label>
+      <input type="url" id="gasUrl" placeholder="https://script.google.com/macros/s/…/exec" autocapitalize="off" autocorrect="off">
+      <label class="f" for="appKey">アプリ用キー</label>
+      <input type="password" id="appKey" placeholder="setup実行時にログに出たキー" autocapitalize="off" autocorrect="off">
+      <button class="btn" id="saveConn" type="button">保存して接続</button>
+      <div class="status" id="connStatus"></div>
+    </div>
+  </section>
+</main>
+
+<div class="sticky-save" id="saveBar"><button class="btn" id="saveKw" type="button">キーワードを保存</button></div>
+
+<nav>
+  <button type="button" class="on" data-tab="history">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>通知履歴</button>
+  <button type="button" data-tab="keywords">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>キーワード</button>
+  <button type="button" data-tab="settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>設定</button>
+</nav>
+
+<div id="toast"></div>
+
+<script src="config.js"></script>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getMessaging, getToken, onMessage, isSupported } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging.js';
+
+const $ = id => document.getElementById(id);
+const store = {
+  get(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} },
+};
+let state = { keywords: [], history: [], settings: {}, push: {} };
+let kwDirty = false;
+
+/* ---------- 共通 ---------- */
+function toast(msg) {
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2200);
+}
+function status(el, msg, ok) {
+  el.textContent = msg; el.className = 'status show ' + (ok ? 'ok' : 'ng');
+}
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function isStandalone() {
+  return window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+}
+
+async function api(action, extra = {}) {
+  const url = store.get('gasUrl'), key = store.get('appKey');
+  if (!url || !key) throw new Error('設定タブで接続先を入力してください');
+  let res;
+  if (action === 'data') {
+    res = await fetch(url + '?action=data&key=' + encodeURIComponent(key));
+  } else {
+    res = await fetch(url, { method: 'POST', body: JSON.stringify(Object.assign({ action, key }, extra)) });
+  }
+  let j;
+  try { j = await res.json(); } catch (e) { throw new Error('Apps Scriptから正しい応答がありません（URLとデプロイ設定を確認）'); }
+  if (!j.ok) throw new Error(j.error || 'エラーが発生しました');
+  return j;
+}
+
+/* ---------- タブ ---------- */
+document.querySelectorAll('nav button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('nav button').forEach(x => x.classList.toggle('on', x === b));
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x.id === 'tab-' + b.dataset.tab));
+  $('saveBar').classList.toggle('show', b.dataset.tab === 'keywords' && kwDirty);
+  window.scrollTo(0, 0);
+}));
+function currentTab() { return document.querySelector('nav button.on').dataset.tab; }
+
+/* ---------- 読み込み ---------- */
+async function load() {
+  if (!store.get('gasUrl') || !store.get('appKey')) {
+    $('historyList').innerHTML = '<div class="empty">はじめに「設定」タブで<br>接続先を入力してください</div>';
+    document.querySelector('nav button[data-tab="settings"]').click();
+    return;
+  }
+  try {
+    const j = await api('data');
+    state = j.data;
+    if (!kwDirty) renderKeywords();
+    renderHistory();
+    renderSettings();
+  } catch (e) {
+    $('historyList').innerHTML = '<div class="empty">' + esc(e.message) + '</div>';
+  }
+}
+
+/* ---------- 通知履歴 ---------- */
+function renderHistory() {
+  const list = state.history || [];
+  if (!list.length) {
+    $('historyList').innerHTML = '<div class="empty">まだ通知はありません<br>キーワードに該当する開示が出ると、ここに並びます</div>';
+    return;
+  }
+  $('historyList').innerHTML = list.map(h => {
+    const inner = `
+      <div class="meta"><span class="code">${esc(h.code)}</span><span>${esc(h.name)}</span><span>${esc(h.date)} ${esc(h.time)}</span></div>
+      <div class="ttl">${esc(h.title)}</div>
+      <div>${String(h.matched || '').split(' / ').filter(Boolean).map(m => `<span class="chip">${esc(m)}</span>`).join(' ')}</div>`;
+    return /^https:\/\//.test(h.pdf)
+      ? `<a class="card" href="${esc(h.pdf)}" target="_blank" rel="noopener">${inner}</a>`
+      : `<div class="card">${inner}</div>`;
+  }).join('');
+}
+
+/* ---------- キーワード ---------- */
+function renderKeywords() {
+  const list = state.keywords || [];
+  if (!list.length) {
+    $('kwList').innerHTML = '<div class="empty">キーワードがありません</div>';
+    return;
+  }
+  $('kwList').innerHTML = list.map((k, i) => `
+    <div class="card" data-i="${i}">
+      <div class="row">
+        <div class="grow kw-head">${esc(k.keyword) || '（新しいキーワード）'}</div>
+        <label class="sw"><input type="checkbox" data-f="enabled" ${k.enabled ? 'checked' : ''}><span></span></label>
+      </div>
+      <label class="f">キーワード</label>
+      <input type="text" data-f="keyword" value="${esc(k.keyword)}" placeholder="例：株主優待 新設">
+      <label class="f">除外キーワード（どれか含めば通知しない）</label>
+      <input type="text" data-f="exclude" value="${esc(k.exclude)}" placeholder="例：訂正 延期">
+      <label class="f">メモ</label>
+      <input type="text" data-f="memo" value="${esc(k.memo)}">
+      <div class="row" style="justify-content:flex-end;margin-top:10px">
+        <button class="btn danger" type="button" data-del="${i}">削除</button>
+      </div>
+    </div>`).join('');
+}
+function markDirty() {
+  kwDirty = true;
+  $('saveBar').classList.toggle('show', currentTab() === 'keywords');
+}
+$('kwList').addEventListener('input', e => {
+  const card = e.target.closest('.card'); const f = e.target.dataset.f;
+  if (!card || !f) return;
+  const k = state.keywords[+card.dataset.i];
+  k[f] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+  if (f === 'keyword') card.querySelector('.kw-head').textContent = k.keyword || '（新しいキーワード）';
+  markDirty();
+});
+$('kwList').addEventListener('click', e => {
+  const d = e.target.closest('[data-del]');
+  if (!d) return;
+  const k = state.keywords[+d.dataset.del];
+  if (!confirm('「' + (k.keyword || '新しいキーワード') + '」を削除しますか？')) return;
+  state.keywords.splice(+d.dataset.del, 1);
+  renderKeywords(); markDirty();
+});
+$('addKw').addEventListener('click', () => {
+  state.keywords = state.keywords || [];
+  state.keywords.push({ enabled: true, keyword: '', exclude: '', memo: '' });
+  renderKeywords(); markDirty();
+  const inputs = $('kwList').querySelectorAll('input[data-f="keyword"]');
+  inputs[inputs.length - 1].focus();
+});
+$('saveKw').addEventListener('click', async () => {
+  const btn = $('saveKw'); btn.disabled = true; btn.textContent = '保存中…';
+  try {
+    const j = await api('saveKeywords', { keywords: state.keywords });
+    state = j.data; kwDirty = false;
+    renderKeywords(); $('saveBar').classList.remove('show');
+    toast('保存しました。次回のチェックから反映されます');
+  } catch (e) { toast(e.message); }
+  btn.disabled = false; btn.textContent = 'キーワードを保存';
+});
+
+/* ---------- 設定 ---------- */
+function renderSettings() {
+  $('setEnabled').checked = !!state.settings.enabled;
+  $('setMail').checked = !!state.settings.mail;
+  const p = state.push || {};
+  const perm = ('Notification' in window) ? Notification.permission : 'unsupported';
+  $('pushState').textContent = !p.ready ? 'Firebase未設定'
+    : perm === 'granted' ? '登録端末 ' + p.devices + '台' : '未設定';
+}
+async function saveSetting(obj) {
+  try { const j = await api('saveSettings', obj); state = j.data; renderSettings(); toast('変更しました'); }
+  catch (e) { toast(e.message); renderSettings(); }
+}
+$('setEnabled').addEventListener('change', e => saveSetting({ enabled: e.target.checked }));
+$('setMail').addEventListener('change', e => saveSetting({ mail: e.target.checked }));
+
+$('gasUrl').value = store.get('gasUrl');
+$('appKey').value = store.get('appKey');
+$('saveConn').addEventListener('click', async () => {
+  store.set('gasUrl', $('gasUrl').value.trim());
+  store.set('appKey', $('appKey').value.trim());
+  try {
+    const j = await api('data'); state = j.data;
+    renderKeywords(); renderHistory(); renderSettings();
+    status($('connStatus'), '接続できました', true);
+  } catch (e) { status($('connStatus'), e.message, false); }
+});
+
+/* ---------- プッシュ通知 ---------- */
+let messaging = null;
+async function getMessagingSafe() {
+  if (messaging) return messaging;
+  if (!(await isSupported())) throw new Error('この環境ではプッシュ通知を使えません');
+  const app = initializeApp(self.FIREBASE_CONFIG);
+  messaging = getMessaging(app);
+  onMessage(messaging, payload => {
+    const n = payload.notification || {};
+    toast((n.title || '新しい開示') + '\n' + (n.body || ''));
+    load();
+  });
+  return messaging;
+}
+
+$('enablePush').addEventListener('click', async () => {
+  const el = $('pushStatus');
+  if (!isStandalone()) {
+    status(el, 'Safariの共有ボタン →「ホーム画面に追加」をして、ホーム画面のアイコンから開いてから押してください', false);
+    return;
+  }
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+    status(el, 'この iPhone では通知を使えません（iOS 16.4以降が必要です）', false);
+    return;
+  }
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') {
+      status(el, '通知が許可されませんでした。iPhoneの「設定 → 通知 → 開示通知」で許可してください', false);
+      return;
+    }
+    status(el, '登録中…', true);
+    const reg = await navigator.serviceWorker.register('./firebase-messaging-sw.js');
+    await navigator.serviceWorker.ready;
+    const m = await getMessagingSafe();
+    const token = await getToken(m, { vapidKey: self.VAPID_KEY, serviceWorkerRegistration: reg });
+    if (!token) throw new Error('端末の登録に失敗しました');
+    const appUrl = location.href.split('#')[0].split('?')[0].replace(/[^/]*$/, '');
+    const j = await api('registerToken', { token, appUrl });
+    status(el, '通知をONにしました（登録端末 ' + j.devices + '台）', true);
+    load();
+  } catch (e) {
+    status(el, e.message || String(e), false);
+  }
+});
+
+$('testPush').addEventListener('click', async () => {
+  const el = $('pushStatus');
+  try {
+    await api('testPush');
+    status(el, 'テスト通知を送りました。数秒で届きます（アプリを閉じると通知欄に出ます）', true);
+  } catch (e) { status(el, e.message, false); }
+});
+
+/* ---------- 起動 ---------- */
+$('reload').addEventListener('click', () => { kwDirty = false; $('saveBar').classList.remove('show'); load(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && !kwDirty) load(); });
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('./firebase-messaging-sw.js').catch(() => {});
+load();
+</script>
+</body>
+</html>
